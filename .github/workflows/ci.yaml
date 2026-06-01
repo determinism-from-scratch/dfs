@@ -45,4 +45,4 @@ jobs:
       # Non-blocking: reports lints as PR annotations. To gate merges,
       # append `-- -D clippy::all` (see the clippy note below first).
       - name: cargo clippy
-        run: nix develop --command cargo clippy --locked --all-targets
+        run: nix develop --command cargo clippy --locked --all-targets -- -D warnings

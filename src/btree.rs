@@ -26,67 +26,20 @@ impl<T: PartialOrd + PartialEq + std::fmt::Display + std::fmt::Debug> OverFlow<T
         right: Option<Box<BTree<T>>>,
     ) -> Self {
         Self {
-            element: element,
-            left: left,
-            right: right,
+            element,
+            left,
+            right,
         }
     }
 }
 
-//takes reffreferences to option box arrays and swaps first len element
-fn arr_swap<T>(src: &mut [T], dest: &mut [T], len: usize) {
-    for i in 0..len {
-        swap(&mut src[i], &mut dest[i]);
+impl<T> Default for BTree<T>
+where
+    T: PartialOrd + PartialEq + Display + std::fmt::Debug,
+{
+    fn default() -> Self {
+        Self::new()
     }
-}
-
-pub fn test_arr_swap() {
-    let mut array: Vec<usize> = (1..11).collect();
-    let mut left: Vec<usize> = vec![0; 10];
-    for el in left.iter_mut() {
-        *el = 0;
-    }
-    let mut right: Vec<usize> = vec![0; 10];
-    for el in right.iter_mut() {
-        *el = 0;
-    }
-
-    arr_swap(&mut array, &mut left, 10 / 2);
-    arr_swap(&mut array[((10 / 2) + 1)..], &mut right, (10 / 2) - 1);
-
-    let mut exp_left: Vec<usize> = vec![0; 10];
-    for i in 0..5 {
-        exp_left[i] = i + 1;
-    }
-    let mut exp_right: Vec<usize> = vec![0; 10];
-    for i in 0..4 {
-        exp_right[i] = i + 7;
-    }
-    assert_eq!(left, exp_left);
-    assert_eq!(right, exp_right);
-    let mut array: Vec<usize> = (1..12).collect();
-    let mut left: Vec<usize> = vec![0; 11];
-    for el in left.iter_mut() {
-        *el = 0;
-    }
-    let mut right: Vec<usize> = vec![0; 11];
-    for el in right.iter_mut() {
-        *el = 0;
-    }
-
-    arr_swap(&mut array, &mut left, 11 / 2);
-    arr_swap(&mut array[((11 / 2) + 1)..], &mut right, 11 / 2);
-
-    let mut exp_left: Vec<usize> = vec![0; 11];
-    for i in 0..5 {
-        exp_left[i] = i + 1;
-    }
-    let mut exp_right: Vec<usize> = vec![0; 11];
-    for i in 0..5 {
-        exp_right[i] = i + 7;
-    }
-    assert_eq!(left, exp_left);
-    assert_eq!(right, exp_right);
 }
 
 impl<T> BTree<T>
@@ -102,20 +55,16 @@ where
 
     pub fn insert(&mut self, element: T) {
         let tmp = self._insert(element);
-        match tmp {
-            Some(tmp) => {
-                let mut btree: BTree<T> = BTree::<T>::new();
-                btree.elements[0] = tmp.element;
-                btree.pointers[0] = tmp.left;
-                btree.pointers[1] = tmp.right;
-                swap(self, &mut btree);
-                return;
-            }
-            None => return,
+        if let Some(tmp) = tmp {
+            let mut btree: BTree<T> = BTree::<T>::new();
+            btree.elements[0] = tmp.element;
+            btree.pointers[0] = tmp.left;
+            btree.pointers[1] = tmp.right;
+            swap(self, &mut btree);
         }
     }
     fn _len(&self) -> usize {
-        let len = self.elements.iter().position(|e| e == &None);
+        let len = self.elements.iter().position(|e| e.is_none());
         match len {
             Some(l) => l,
             None => ELEMENTS_LEN,
@@ -168,15 +117,12 @@ where
     }
 
     fn _is_leaf_full(&self) -> bool {
-        match self.elements[ELEMENTS_LEN - 1] {
-            None => return false,
-            Some(_) => return true,
-        }
+        self.elements[ELEMENTS_LEN - 1].is_some()
     }
 
     fn _split_node(&mut self) -> OverFlow<T> {
-        let mut left: Box<BTree<T>> = Box::new(BTree::<T>::new());
-        let mut right: Box<BTree<T>> = Box::new(BTree::<T>::new());
+        let mut left: Box<BTree<T>> = Box::default();
+        let mut right: Box<BTree<T>> = Box::default();
 
         let median = MIDLE;
         let left_count = median;
@@ -224,13 +170,13 @@ where
                                 .unwrap()
                                 ._insert_overflow_at_index(right_index, extra);
                         }
-                        return Some(n_extra);
+                        Some(n_extra)
                     } else {
                         self._insert_overflow_at_index(idx, extra);
-                        return None;
+                        None
                     }
                 }
-                None => return None,
+                None => None,
             },
             None => {
                 // leaf insertion
@@ -241,12 +187,12 @@ where
                     } else {
                         extra.right.as_mut().unwrap()._insert(element);
                     }
-                    return Some(extra);
+                    Some(extra)
                 } else {
                     self.elements[idx..].rotate_right(1);
                     self.elements[idx] = Some(Box::new(element));
                     self.pointers[idx..].rotate_right(1);
-                    return None;
+                    None
                 }
             }
         }
@@ -282,7 +228,7 @@ where
             first = false;
             match e {
                 Some(v) => out.push_str(&format!("{v}")),
-                None => out.push_str("_"),
+                None => out.push('_'),
             }
         }
         out.push_str("]\n");
