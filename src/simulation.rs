@@ -1,3 +1,4 @@
+#![allow(unused)]
 mod runtime;
 
 // #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
