@@ -27,7 +27,7 @@ impl FileSystem {
     /// production use, canonicalize the result and check it's still a
     /// prefix of `root`, or use `openat2`/`O_BENEATH` on Linux.
     fn resolve(&self, path: &str) -> PathBuf {
-        let rel = path.trim_start_matches(|c: char| c == '/' || c == '\\');
+        let rel = path.trim_start_matches(['/', '\\']);
         self.root.join(rel)
     }
 }
