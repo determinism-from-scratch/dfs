@@ -1,3 +1,4 @@
 fn main() {
-    println!("Hello, world!");
+    // let fs = FileSystem::new(".").unwrap();
+    // let env = Environment::new(fs);
 }
