@@ -1,4 +1,4 @@
-use crate::btree::BTree;
+use crate::database::btree::BTree;
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng, rng};
 
