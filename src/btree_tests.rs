@@ -1,6 +1,6 @@
 use crate::btree::BTree;
 use rand::rngs::StdRng;
-use rand::{RngExt, SeedableRng, rng};
+use rand::{RngExt, SeedableRng};
 
 /// Asserts that each value exists in the tree and is returned by `find`.
 fn assert_all_present(tree: &BTree<u32>, values: &[u32]) {
