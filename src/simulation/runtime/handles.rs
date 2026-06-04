@@ -25,5 +25,5 @@ pub struct Handle {
 }
 
 thread_local! {
-   pub  static HANDLE: RefCell<Option<Handle>> = RefCell::new(None);
+   pub static HANDLE: RefCell<Option<Handle>> = RefCell::new(None);
 }

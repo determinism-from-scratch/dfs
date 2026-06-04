@@ -1,10 +1,13 @@
-use crate::{
-    abstraction::file_system::FileSystem,
-    simulation::runtime::{Action, Context},
-};
+// pub mod fifo;
 
-pub mod fifo;
+use crate::simulation::runtime::{Event, handles::Request};
 
 pub trait Scheduler {
-    fn decide<FS: FileSystem>(&mut self, cx: &Context<FS>) -> Action;
+    fn schedule(&mut self, req: Request) -> Event {
+        unimplemented!()
+    }
+
+    fn reschedule(&mut self, event: Event) -> Event {
+        unimplemented!()
+    }
 }
