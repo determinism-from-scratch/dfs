@@ -67,6 +67,7 @@ impl file_system::FileSystem for FileSystem {
     }
 }
 
+#[derive(Debug)]
 pub struct File {
     fd: Fd,
 }
@@ -158,6 +159,7 @@ mod test {
     }
 
     use super::*;
+    use crate::abstraction::file_system::File as _;
     #[test]
     fn open() {
         // Setup
@@ -181,5 +183,183 @@ mod test {
         );
         let file = file.unwrap();
         assert_eq!(file.fd, 0);
+    }
+
+    #[test]
+    fn open_error() {
+        let (resp_sender, req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        resp_sender
+            .send(Response::File(FileResult::Open(Err(io::Error::from(
+                io::ErrorKind::NotFound,
+            )))))
+            .unwrap();
+
+        let file = fs.open("missing", OpenMode::Read);
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Open {
+                path: String::from("missing"),
+                mode: OpenMode::Read,
+            })
+        );
+        let err = file.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn delete() {
+        let (resp_sender, req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        resp_sender
+            .send(Response::File(FileResult::Delete(Ok(()))))
+            .unwrap();
+
+        let res = fs.delete("test");
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Delete {
+                path: String::from("test"),
+            })
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn read() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Read(Ok(vec![1, 2, 3, 4]))))
+            .unwrap();
+
+        let mut buf = [0u8; 4];
+        let n = file.read(&mut buf).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Read { fd: 0, len: 4 }));
+        assert_eq!(n, 4);
+        assert_eq!(&buf, &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn read_partial() {
+        // Runtime returns fewer bytes than the buffer can hold.
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Read(Ok(vec![9, 9]))))
+            .unwrap();
+
+        let mut buf = [0u8; 8];
+        let n = file.read(&mut buf).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Read { fd: 0, len: 8 }));
+        assert_eq!(n, 2);
+        assert_eq!(&buf[..2], &[9, 9]);
+        assert_eq!(&buf[2..], &[0; 6]); // tail left untouched
+    }
+
+    #[test]
+    fn read_error() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(7);
+
+        resp_sender
+            .send(Response::File(FileResult::Read(Err(io::Error::from(
+                io::ErrorKind::UnexpectedEof,
+            )))))
+            .unwrap();
+
+        let mut buf = [0u8; 8];
+        let res = file.read(&mut buf);
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Read { fd: 7, len: 8 }));
+        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
+        assert_eq!(&buf, &[0; 8]); // nothing copied on error
+    }
+
+    #[test]
+    fn write() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Write(Ok(3))))
+            .unwrap();
+
+        let n = file.write(&[1, 2, 3]).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Write {
+                fd: 0,
+                data: vec![1, 2, 3],
+            })
+        );
+        assert_eq!(n, 3);
+    }
+
+    #[test]
+    fn lseek() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Seek(Ok(128))))
+            .unwrap();
+
+        let pos = file.lseek(SeekFrom::Start(128)).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Seek {
+                fd: 0,
+                pos: SeekFrom::Start(128),
+            })
+        );
+        assert_eq!(pos, 128);
+    }
+
+    #[test]
+    fn close() {
+        let (resp_sender, req_receiver) = init();
+        let file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Close(Ok(()))))
+            .unwrap();
+
+        let res = file.close();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Close { fd: 0 }));
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "runtime broke protocol")]
+    fn protocol_mismatch() {
+        // Runtime answers an Open with a Delete response — the stub must reject it.
+        let (resp_sender, _req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        resp_sender
+            .send(Response::File(FileResult::Delete(Ok(()))))
+            .unwrap();
+
+        let _ = fs.open("test", OpenMode::Read);
     }
 }
