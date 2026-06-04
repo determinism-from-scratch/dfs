@@ -1,35 +1,9 @@
-use std::{
-    io::{self, SeekFrom},
-    panic,
+use std::{io, panic};
+
+use crate::{
+    abstraction::{Request, Response, file_system, trap},
+    simulation::runtime::file_system::{Fd, FileOp, FileResult},
 };
-
-use crate::abstraction::{
-    Request, Response,
-    file_system::{self, OpenMode},
-    trap,
-};
-
-type Fd = u32;
-
-#[derive(Debug, PartialEq)]
-pub enum FileOp {
-    Open { path: String, mode: OpenMode },
-    Delete { path: String },
-    Read { fd: Fd, len: usize },
-    Write { fd: Fd, data: Vec<u8> },
-    Seek { fd: Fd, pos: SeekFrom },
-    Close { fd: Fd },
-}
-
-#[derive(Debug)]
-pub enum FileResult {
-    Open(io::Result<Fd>),
-    Delete(io::Result<()>),
-    Read(io::Result<Vec<u8>>),
-    Write(io::Result<usize>),
-    Seek(io::Result<u64>),
-    Close(io::Result<()>),
-}
 
 pub struct FileSystem {}
 
@@ -134,11 +108,14 @@ impl file_system::File for File {
 
 #[cfg(test)]
 mod test {
-    use std::sync::mpsc::{Receiver, Sender, channel};
+    use std::{
+        io::SeekFrom,
+        sync::mpsc::{Receiver, Sender, channel},
+    };
 
-    use crate::abstraction::{
-        HANDLE, Handle,
-        file_system::{FileSystem, OpenMode},
+    use crate::{
+        abstraction::file_system::{FileSystem, OpenMode},
+        simulation::runtime::handles::{HANDLE, Handle},
     };
 
     fn init() -> (Sender<Response>, Receiver<Request>) {

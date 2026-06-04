@@ -6,5 +6,5 @@ use dfs::{
 fn main() {
     let fs = FileSystem {};
     let env = Environment::new(fs);
-    let replica = Replica::new(env);
+    let _replica = Replica::new(env);
 }

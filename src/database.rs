@@ -10,11 +10,7 @@ pub struct Replica<FS: FileSystem> {
 
 impl<FS: FileSystem> Replica<FS> {
     pub fn run(&mut self) {
-        let file = self
-            .env
-            .file_system
-            .open("hello", crate::abstraction::file_system::OpenMode::Read)
-            .unwrap();
+        unimplemented!()
     }
 }
 

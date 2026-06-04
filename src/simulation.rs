@@ -1,5 +1,5 @@
 #![allow(unused)]
-mod runtime;
+pub mod runtime;
 
 // #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 // struct ReplicaId(u64);
