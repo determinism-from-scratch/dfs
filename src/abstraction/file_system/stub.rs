@@ -2,7 +2,7 @@ use std::{io, panic};
 
 use crate::{
     abstraction::{Request, Response, file_system, trap},
-    simulation::runtime::file_system::{Fd, FileOp, FileResult},
+    simulation::runtime::handles::file_system::{Fd, FileOp, FileResult},
 };
 
 pub struct FileSystem {}

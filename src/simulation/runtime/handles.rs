@@ -1,11 +1,11 @@
-mod file_system;
+pub mod file_system;
 
 use std::{
     cell::RefCell,
     sync::mpsc::{Receiver, Sender},
 };
 
-use crate::simulation::runtime::file_system::{FileOp, FileResult};
+use crate::simulation::runtime::handles::file_system::{FileOp, FileResult};
 
 #[derive(Debug, PartialEq)]
 pub enum Request {
