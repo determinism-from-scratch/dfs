@@ -1,6 +1,7 @@
 // pub mod fifo;
 
-use crate::simulation::runtime::{Event, handles::Request};
+use super::Event;
+use super::replica::handles::Request;
 
 pub trait Scheduler {
     fn schedule(&mut self, req: Request) -> Event {

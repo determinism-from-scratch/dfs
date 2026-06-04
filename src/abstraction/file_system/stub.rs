@@ -1,8 +1,11 @@
 use std::{io, panic};
 
 use crate::{
-    abstraction::{Request, Response, file_system, trap},
-    simulation::runtime::handles::file_system::{Fd, FileOp, FileResult},
+    abstraction::{file_system, trap},
+    simulation::runtime::replica::handles::{
+        Request, Response,
+        file_system::{Fd, FileOp, FileResult},
+    },
 };
 
 pub struct FileSystem {}
@@ -115,7 +118,7 @@ mod test {
 
     use crate::{
         abstraction::file_system::{FileSystem, OpenMode},
-        simulation::runtime::handles::{HANDLE, Handle},
+        simulation::runtime::replica::handles::{HANDLE, Handle},
     };
 
     fn init() -> (Sender<Response>, Receiver<Request>) {
