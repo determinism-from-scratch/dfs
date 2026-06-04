@@ -1,4 +1,3 @@
-
 pub mod real;
 pub mod stub;
 
@@ -20,7 +19,7 @@ pub trait FileSystem: Send + Sync {
     fn delete(&self, path: &str) -> io::Result<()>;
 }
 
-pub trait File: Send + Debug {
+pub trait File: Send {
     /// Explicit close. `Drop` also closes; the explicit form lets
     /// implementations surface deferred errors (buffered flushes,
     /// fsync failures, late allocation on NFS, etc.).

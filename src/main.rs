@@ -1,4 +1,10 @@
+use dfs::{
+    abstraction::{environment::Environment, file_system::stub::FileSystem},
+    database::Replica,
+};
+
 fn main() {
-    // let fs = FileSystem::new(".").unwrap();
-    // let env = Environment::new(fs);
+    let fs = FileSystem {};
+    let env = Environment::new(fs);
+    let replica = Replica::new(env);
 }
