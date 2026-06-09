@@ -4,14 +4,6 @@
 use std::fmt::Debug;
 use std::io::{self};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum OpenMode {
-    Read,
-    Write,
-    ReadWrite,
-    Append,
-}
-
 thread_local! {
     static FILE_SYSTEM: FileSystem = FileSystem::Real(real::FileSystem::new(String::from("")).unwrap());
 }

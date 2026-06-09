@@ -24,7 +24,6 @@ impl<FS: FileSystem> Environment<FS> {
             Request::Start => Action::Run(Response::Start),
             Request::File(_) => self.file_system.serve(event),
             Request::Shutdown => Action::Remove,
-            _ => unimplemented!(),
         }
     }
 }

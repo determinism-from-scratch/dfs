@@ -31,13 +31,15 @@ thread_local! {
 pub mod file_system {
     use std::io::{self, SeekFrom};
 
+    use crate::simulation::runtime::environment::file_system::memory::OpenMode;
+
     // use crate::abstraction::file_system::OpenMode;
 
     pub type Fd = u32;
 
     #[derive(Debug, PartialEq)]
     pub enum FileOp {
-        // Open { path: String, mode: OpenMode },
+        Open { path: String, mode: OpenMode },
         Delete { path: String },
         Read { fd: Fd, len: usize },
         Write { fd: Fd, data: Vec<u8> },
