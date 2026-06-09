@@ -7,12 +7,14 @@ use crate::simulation::runtime::replica::handles::file_system::{FileOp, FileResu
 
 #[derive(Debug, PartialEq)]
 pub enum Request {
+    Start,
     File(FileOp),
     Shutdown,
 }
 
 #[derive(Debug)]
 pub enum Response {
+    Start,
     File(FileResult),
     Shutdown,
 }
@@ -26,16 +28,16 @@ thread_local! {
    pub static HANDLE: RefCell<Option<Handle>> = RefCell::new(None);
 }
 
-mod file_system {
+pub mod file_system {
     use std::io::{self, SeekFrom};
 
-    use crate::abstraction::file_system::OpenMode;
+    // use crate::abstraction::file_system::OpenMode;
 
     pub type Fd = u32;
 
     #[derive(Debug, PartialEq)]
     pub enum FileOp {
-        Open { path: String, mode: OpenMode },
+        // Open { path: String, mode: OpenMode },
         Delete { path: String },
         Read { fd: Fd, len: usize },
         Write { fd: Fd, data: Vec<u8> },

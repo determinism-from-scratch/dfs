@@ -1,3 +1,5 @@
+pub mod perfect;
+
 use super::Event;
 
 pub enum Fault {

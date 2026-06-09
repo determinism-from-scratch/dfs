@@ -1,6 +1,6 @@
 use crate::abstraction::file_system::FileSystem;
 
-pub struct Environment<FS: FileSystem> {
+pub struct Environment {
     pub file_system: FS,
 }
 
