@@ -1,4 +1,5 @@
 pub mod counter;
+pub mod environment;
 pub mod event_queue;
 pub mod fault_injector;
 pub mod replica;
@@ -16,14 +17,13 @@ use event_queue::EventQueue;
 use fault_injector::{Fault, FaultInjector};
 use replica::{
     Replica,
-    environment::{Action, file_system::FileSystem},
     handles::{Request, Response},
 };
 use scheduler::Scheduler;
 
-use crate::simulation::runtime::replica::{
-    environment::Environment,
-    handles::{HANDLE, Handle},
+use crate::simulation::runtime::{
+    environment::{Action, Environment, file_system::FileSystem},
+    replica::handles::{HANDLE, Handle},
 };
 
 type ReplicaId = usize;
@@ -41,21 +41,23 @@ pub struct Event {
 pub struct Runtime<S: Scheduler, F: FaultInjector, FS: FileSystem> {
     scheduler: S,
     fault_injector: F,
+    environment: Environment<FS>,
     queue: EventQueue,
-    replicas: Vec<Replica<FS>>,
+    replicas: Vec<Replica>,
 }
 
 impl<S: Scheduler, F: FaultInjector, FS: FileSystem> Runtime<S, F, FS> {
-    pub fn new(scheduler: S, fault_injector: F) -> Self {
+    pub fn new(scheduler: S, fault_injector: F, environment: Environment<FS>) -> Self {
         Self {
             scheduler,
             fault_injector,
+            environment,
             queue: EventQueue::new(),
             replicas: Vec::new(),
         }
     }
 
-    pub fn spawn<W>(&mut self, environment: Environment<FS>, workload: W)
+    pub fn spawn<W>(&mut self, workload: W)
     where
         W: FnOnce() + Send + 'static,
     {
@@ -97,7 +99,7 @@ impl<S: Scheduler, F: FaultInjector, FS: FileSystem> Runtime<S, F, FS> {
         self.queue.push(event);
 
         self.replicas
-            .push(Replica::new(id, environment, req_receiver, resp_sender));
+            .push(Replica::new(id, req_receiver, resp_sender));
     }
 
     pub fn run(&mut self) {
@@ -109,7 +111,7 @@ impl<S: Scheduler, F: FaultInjector, FS: FileSystem> Runtime<S, F, FS> {
                 .get_mut(next.replica_id)
                 .expect("replica needed for handling request not existing");
 
-            let resp = match replica.environment().serve(next) {
+            let resp = match self.environment.serve(next) {
                 Action::Requeue(event) => {
                     let event = self.scheduler.reschedule(event);
                     self.queue.push(event);

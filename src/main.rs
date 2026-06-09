@@ -1,22 +1,19 @@
 use dfs::simulation::runtime::{
     Runtime,
+    environment::{Environment, file_system::memory},
     fault_injector::perfect::FaultInjector,
-    replica::environment::{Environment, file_system::memory::FileSystem},
     scheduler::fifo::Scheduler,
 };
 
 fn main() {
-    let fs = FileSystem {};
+    let fs = memory::FileSystem {};
+    let env = Environment::new(fs);
     let scheduler = Scheduler::new();
     let fault_injector = FaultInjector {};
 
-    let mut runtime: Runtime<Scheduler, FaultInjector, FileSystem> =
-        Runtime::new(scheduler, fault_injector);
+    let mut runtime = Runtime::new(scheduler, fault_injector, env);
 
-    let env = Environment::new(
-        dfs::simulation::runtime::replica::environment::file_system::memory::FileSystem {},
-    );
-    runtime.spawn(env, || {
+    runtime.spawn(|| {
         println!("hello");
     });
 

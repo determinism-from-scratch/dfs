@@ -1,4 +1,4 @@
-use crate::simulation::runtime::{Event, replica::environment::Action};
+use crate::simulation::runtime::{Event, environment::Action};
 
 pub mod memory;
 

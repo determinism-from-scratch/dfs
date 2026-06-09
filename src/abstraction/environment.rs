@@ -1,7 +1,7 @@
 use crate::abstraction::file_system::FileSystem;
 
 pub struct Environment {
-    pub file_system: FS,
+    pub file_system: FileSystem,
 }
 
 impl<FS: FileSystem> Environment<FS> {

@@ -1,9 +1,8 @@
 pub mod file_system;
 
-use crate::simulation::runtime::replica::handles::Request;
+use crate::simulation::runtime::Event;
+use crate::simulation::runtime::replica::handles::{Request, Response};
 
-use super::super::Event;
-use super::handles::Response;
 use file_system::FileSystem;
 
 pub enum Action {
