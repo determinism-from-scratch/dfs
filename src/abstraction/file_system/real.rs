@@ -31,10 +31,8 @@ impl FileSystem {
     }
 }
 
-impl file_system::FileSystem for FileSystem {
-    type File = File;
-
-    fn open(&self, path: &str, mode: OpenMode) -> io::Result<File> {
+impl FileSystem {
+    pub fn open(&self, path: &str, mode: OpenMode) -> io::Result<File> {
         let full = self.resolve(path);
         if let Some(parent) = full.parent() {
             std::fs::create_dir_all(parent)?;
@@ -59,7 +57,7 @@ impl file_system::FileSystem for FileSystem {
         })
     }
 
-    fn delete(&self, path: &str) -> io::Result<()> {
+    pub fn delete(&self, path: &str) -> io::Result<()> {
         std::fs::remove_file(self.resolve(path))
     }
 }
@@ -69,23 +67,23 @@ pub struct File {
     inner: std::fs::File,
 }
 
-impl file_system::File for File {
-    fn close(self) -> io::Result<()> {
+impl File {
+    pub fn close(self) -> io::Result<()> {
         // If you care about flush/sync errors at close time, call
         // self.inner.sync_all()? before dropping.
         drop(self.inner);
         Ok(())
     }
 
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         io::Read::read(&mut self.inner, buf)
     }
 
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    pub fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         io::Write::write(&mut self.inner, buf)
     }
 
-    fn lseek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    pub fn lseek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         io::Seek::seek(&mut self.inner, pos)
     }
 }

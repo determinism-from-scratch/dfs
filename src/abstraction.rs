@@ -1,5 +1,5 @@
 // pub mod environment;
-// pub mod file_system;
+pub mod file_system;
 
 // thread_local! {
 //
@@ -24,4 +24,5 @@
 //
 //     let resp = HANDLE.with_borrow_mut(|handle| handle.as_mut().unwrap().response.recv());
 //     resp.expect("runtime terminated before replicas")
+//
 // }

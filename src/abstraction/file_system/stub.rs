@@ -10,9 +10,8 @@ use crate::{
 
 pub struct FileSystem {}
 
-impl file_system::FileSystem for FileSystem {
-    type File = File;
-    fn open(&self, path: &str, mode: file_system::OpenMode) -> std::io::Result<Self::File> {
+impl FileSystem {
+    pub fn open(&self, path: &str, mode: file_system::OpenMode) -> std::io::Result<Self::File> {
         let req = Request::File(FileOp::Open {
             path: String::from(path),
             mode,
@@ -29,7 +28,7 @@ impl file_system::FileSystem for FileSystem {
             wrong => panic!("runtime broke protocol {:?}", wrong),
         }
     }
-    fn delete(&self, path: &str) -> std::io::Result<()> {
+    pub fn delete(&self, path: &str) -> std::io::Result<()> {
         let req = Request::File(FileOp::Delete {
             path: String::from(path),
         });
@@ -55,8 +54,8 @@ impl File {
     }
 }
 
-impl file_system::File for File {
-    fn close(self) -> std::io::Result<()>
+impl File {
+    pub fn close(self) -> std::io::Result<()>
     where
         Self: Sized,
     {
@@ -67,7 +66,7 @@ impl file_system::File for File {
         }
     }
 
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    pub fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let req = Request::File(FileOp::Read {
             fd: self.fd,
             len: buf.len(),
@@ -85,7 +84,7 @@ impl file_system::File for File {
         }
     }
 
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    pub fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let req = Request::File(FileOp::Write {
             fd: self.fd,
             data: buf.iter().map(|n| *n).collect(),
@@ -96,7 +95,7 @@ impl file_system::File for File {
         }
     }
 
-    fn lseek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+    pub fn lseek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
         let req = Request::File(FileOp::Seek {
             fd: self.fd,
             pos: pos,
