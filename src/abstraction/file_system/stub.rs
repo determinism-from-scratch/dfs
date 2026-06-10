@@ -11,7 +11,7 @@ use crate::{
 pub struct FileSystem {}
 
 impl FileSystem {
-    pub fn open(&self, path: &str, mode: file_system::OpenMode) -> std::io::Result<Self::File> {
+    pub fn open(&self, path: &str, mode: file_system::OpenMode) -> std::io::Result<File> {
         let req = Request::File(FileOp::Open {
             path: String::from(path),
             mode,
@@ -22,7 +22,7 @@ impl FileSystem {
         };
         match res {
             FileResult::Open(res) => match res {
-                io::Result::Ok(fd) => io::Result::Ok(Self::File::new(fd)),
+                io::Result::Ok(fd) => io::Result::Ok(File::new(fd)),
                 io::Result::Err(err) => io::Result::Err(err),
             },
             wrong => panic!("runtime broke protocol {:?}", wrong),

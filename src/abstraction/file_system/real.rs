@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::abstraction::file_system::{self, OpenMode};
+use crate::abstraction::file_system::OpenMode;
 use std::io;
 
 #[derive(Clone, Debug)]

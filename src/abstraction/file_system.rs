@@ -1,7 +1,6 @@
 pub mod real;
 pub mod stub;
 
-use std::fmt::Debug;
 use std::io::{self};
 
 use crate::simulation::runtime::environment::file_system::memory::OpenMode;
@@ -23,11 +22,11 @@ pub fn delete(path: &str) -> io::Result<()> {
     FILE_SYSTEM.with(|fs| fs.delete(path))
 }
 
-pub fn copy(path: &str) {
-    FILE_SYSTEM.with(|fs| fs.copy(path))
+pub fn copy(src: &str, dst: &str) {
+    FILE_SYSTEM.with(|fs| fs.copy(src, dst))
 }
 
-enum File {
+pub enum File {
     Real(real::File),
     Stub(stub::File),
 }
@@ -80,30 +79,11 @@ impl FileSystem {
             Self::Stub(fs) => fs.delete(path),
         }
     }
-    fn copy(&self, path: &str) {
+    #[allow(unused)]
+    fn copy(&self, src: &str, dst: &str) {
         match self {
             Self::Real(fs) => unimplemented!(),
             Self::Stub(fs) => unimplemented!(),
         }
     }
 }
-
-// pub trait FileSystem: Send + Sync {
-//     type File: File;
-//
-//     fn open(&self, path: &str, mode: OpenMode) -> io::Result<Self::File>;
-//     fn delete(&self, path: &str) -> io::Result<()>;
-// }
-//
-// pub trait File: Send {
-//     /// Explicit close. `Drop` also closes; the explicit form lets
-//     /// implementations surface deferred errors (buffered flushes,
-//     /// fsync failures, late allocation on NFS, etc.).
-//     fn close(self) -> io::Result<()>
-//     where
-//         Self: Sized;
-//
-//     fn read(&mut self, buf: &mut [u]) -> io::Result<usize>;
-//     fn write(&mut self, buf: &[u8]) -> io::Result<usize>;
-//     fn lseek(&mut self, pos: SeekFrom) -> io::Result<u64>;
-// }
