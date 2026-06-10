@@ -26,6 +26,12 @@ impl EventQueue {
     }
 }
 
+impl Default for EventQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct EventOrd(Event);
 
 impl PartialEq for EventOrd {

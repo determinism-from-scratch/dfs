@@ -12,3 +12,9 @@ impl Replica {
         Self {}
     }
 }
+
+impl Default for Replica {
+    fn default() -> Self {
+        Self::new()
+    }
+}

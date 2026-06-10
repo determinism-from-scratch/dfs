@@ -87,7 +87,7 @@ impl File {
     pub fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let req = Request::File(FileOp::Write {
             fd: self.fd,
-            data: buf.iter().map(|n| *n).collect(),
+            data: buf.to_vec(),
         });
         match trap(req) {
             Response::File(FileResult::Write(res)) => res,
@@ -96,10 +96,7 @@ impl File {
     }
 
     pub fn lseek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
-        let req = Request::File(FileOp::Seek {
-            fd: self.fd,
-            pos: pos,
-        });
+        let req = Request::File(FileOp::Seek { fd: self.fd, pos });
 
         match trap(req) {
             Response::File(FileResult::Seek(res)) => res,
@@ -116,7 +113,7 @@ mod test {
     };
 
     use crate::{
-        abstraction::file_system::{FileSystem, OpenMode},
+        abstraction::file_system::OpenMode,
         simulation::runtime::replica::handles::{HANDLE, Handle},
     };
 
@@ -138,7 +135,6 @@ mod test {
     }
 
     use super::*;
-    use crate::abstraction::file_system::File as _;
     #[test]
     fn open() {
         // Setup

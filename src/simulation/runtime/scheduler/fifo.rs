@@ -12,6 +12,12 @@ impl Scheduler {
     }
 }
 
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl super::Scheduler for Scheduler {
     fn schedule(&mut self, req: Request, replica_id: ReplicaId) -> Event {
         let sequence = self.counter.next();

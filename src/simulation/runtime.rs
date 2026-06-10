@@ -5,13 +5,7 @@ pub mod fault_injector;
 pub mod replica;
 pub mod scheduler;
 
-use std::{
-    cell::{RefCell, RefMut},
-    cmp::Ordering,
-    collections::{BinaryHeap, VecDeque},
-    sync::mpsc::{Receiver, Sender, channel},
-    thread,
-};
+use std::{sync::mpsc::channel, thread};
 
 use event_queue::EventQueue;
 use fault_injector::{Fault, FaultInjector};
@@ -91,7 +85,7 @@ impl<S: Scheduler, F: FaultInjector, FS: FileSystem> Runtime<S, F, FS> {
             workload();
 
             HANDLE.with_borrow_mut(|h| {
-                h.as_ref().unwrap().request.send(Request::Shutdown);
+                let _ = h.as_ref().unwrap().request.send(Request::Shutdown);
             });
         });
 
