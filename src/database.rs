@@ -1,6 +1,8 @@
 pub mod btree;
 #[cfg(test)]
 pub mod btree_tests;
+pub mod file;
+pub mod page;
 
 pub struct Replica {}
 
