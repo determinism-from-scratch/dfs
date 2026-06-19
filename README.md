@@ -86,23 +86,3 @@ cargo run
 ```
 
 Spawns a single replica that prints and drives one pass of the simulation loop.
-
-## Continuous integration
-
-`.github/workflows/ci.yaml` runs three jobs on every push / PR to `main`, each inside `nix develop` so local and CI toolchains match:
-
-- **compile** — `cargo build --locked --all-targets`
-- **test** — `cargo test --locked`
-- **clippy** — `cargo clippy --locked --all-targets -- -D warnings` (warnings are errors)
-
-The CI badge above goes green only when all three pass, so it doubles as the "it compiles" and "clippy is clean" indicator. For separate per-job badges, split the workflow or use a per-job badge service.
-
-## Roadmap
-
-- Clean replica shutdown via stored `JoinHandle`s (the `Shutdown` request/response path; threads are currently detached).
-- Additional fault injectors beyond the perfect/identity one, with per-op fault types so invalid op/fault pairings are unrepresentable.
-- Fuller in-memory filesystem semantics — POSIX-faithful errno mapping at every operation.
-
-## License
-
-Not yet specified — add a `LICENSE` file before publishing.
