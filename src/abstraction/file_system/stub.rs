@@ -1,179 +1,340 @@
+use std::{io, panic};
 
-use std::collections::BTreeMap;
-use std::io::{self, SeekFrom};
-use std::sync::{Arc, Mutex};
+use crate::{
+    abstraction::{file_system, trap},
+    simulation::runtime::replica::handles::{
+        Request, Response,
+        file_system::{Fd, FileOp, FileResult},
+    },
+};
 
-use crate::abstraction::file_system::{self, OpenMode};
-
-type Inode = Arc<Mutex<Vec<u8>>>;
-
-#[derive(Clone, Default, Debug)]
-pub struct FileSystem {
-    /// Cloning a `MemFs` clones the Arc — both handles see the same files.
-    /// Construct fresh `MemFs::new()` instances when you want isolated FSes.
-    inner: Arc<Mutex<BTreeMap<String, Inode>>>,
-}
+pub struct FileSystem {}
 
 impl FileSystem {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Test helper: list every path currently present.
-    pub fn list(&self) -> Vec<String> {
-        self.inner.lock().unwrap().keys().cloned().collect()
-    }
-
-    /// Test helper: snapshot a path's contents (useful for assertions).
-    pub fn snapshot(&self, path: &str) -> Option<Vec<u8>> {
-        let fs = self.inner.lock().unwrap();
-        fs.get(path).map(|i| i.lock().unwrap().clone())
-    }
-}
-
-impl file_system::FileSystem for FileSystem {
-    type File = File;
-
-    fn open(&self, path: &str, mode: OpenMode) -> io::Result<File> {
-        // Hold the FS lock only long enough to clone out the Arc handle
-        // to the file's contents.
-        let inode: Inode = {
-            let mut fs = self.inner.lock().unwrap();
-            match mode {
-                OpenMode::Read => fs
-                    .get(path)
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, path.to_string()))?
-                    .clone(),
-                OpenMode::Write => {
-                    let inode = fs
-                        .entry(path.to_string())
-                        .or_insert_with(|| Arc::new(Mutex::new(Vec::new())))
-                        .clone();
-                    inode.lock().unwrap().clear(); // truncate
-                    inode
-                }
-                OpenMode::ReadWrite | OpenMode::Append => fs
-                    .entry(path.to_string())
-                    .or_insert_with(|| Arc::new(Mutex::new(Vec::new())))
-                    .clone(),
-            }
+    pub fn open(&self, path: &str, mode: file_system::OpenMode) -> std::io::Result<File> {
+        let req = Request::File(FileOp::Open {
+            path: String::from(path),
+            mode,
+        });
+        let res = match trap(req) {
+            Response::File(res) => res,
+            wrong => panic!("runtime broke protocol {:?}", wrong),
         };
-
-        let (can_read, can_write, append) = match mode {
-            OpenMode::Read => (true, false, false),
-            OpenMode::Write => (false, true, false),
-            OpenMode::ReadWrite => (true, true, false),
-            OpenMode::Append => (false, true, true),
-        };
-
-        let cursor = if append {
-            inode.lock().unwrap().len() as u64
-        } else {
-            0
-        };
-
-        Ok(File {
-            contents: inode,
-            cursor,
-            can_read,
-            can_write,
-            append,
-        })
-    }
-
-    fn delete(&self, path: &str) -> io::Result<()> {
-        let mut fs = self.inner.lock().unwrap();
-        if fs.remove(path).is_none() {
-            return Err(io::Error::new(io::ErrorKind::NotFound, path.to_string()));
+        match res {
+            FileResult::Open(res) => match res {
+                io::Result::Ok(fd) => io::Result::Ok(File::new(fd)),
+                io::Result::Err(err) => io::Result::Err(err),
+            },
+            wrong => panic!("runtime broke protocol {:?}", wrong),
         }
-        Ok(())
+    }
+    pub fn delete(&self, path: &str) -> std::io::Result<()> {
+        let req = Request::File(FileOp::Delete {
+            path: String::from(path),
+        });
+        let res = match trap(req) {
+            Response::File(res) => res,
+            wrong => panic!("runtime broke protocol {:?}", wrong),
+        };
+        match res {
+            FileResult::Delete(res) => res,
+            wrong => panic!("runtime broke protocol {:?}", wrong),
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct File {
-    contents: Inode,
-    cursor: u64,
-    can_read: bool,
-    can_write: bool,
-    append: bool,
+    fd: Fd,
 }
 
-impl file_system::File for File {
-    fn close(self) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if !self.can_read {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "not opened for read",
-            ));
-        }
-        let data = self.contents.lock().unwrap();
-        let start = self.cursor as usize;
-        if start >= data.len() {
-            return Ok(0); // EOF
-        }
-        let n = std::cmp::min(buf.len(), data.len() - start);
-        buf[..n].copy_from_slice(&data[start..start + n]);
-        self.cursor += n as u64;
-        Ok(n)
-    }
-
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if !self.can_write {
-            return Err(io::Error::new(
-                io::ErrorKind::PermissionDenied,
-                "not opened for write",
-            ));
-        }
-        let mut data = self.contents.lock().unwrap();
-        if self.append {
-            // O_APPEND: every write goes to current EOF, atomically wrt
-            // other writers on the same inode.
-            self.cursor = data.len() as u64;
-        }
-        let start = self.cursor as usize;
-        // Sparse semantics: writing past EOF zero-fills the hole.
-        if start > data.len() {
-            data.resize(start, 0);
-        }
-        let end = start + buf.len();
-        if end > data.len() {
-            data.resize(end, 0);
-        }
-        data[start..end].copy_from_slice(buf);
-        self.cursor = end as u64;
-        Ok(buf.len())
-    }
-
-    fn lseek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        let len = self.contents.lock().unwrap().len() as u64;
-        let new = match pos {
-            SeekFrom::Start(n) => n,
-            SeekFrom::End(d) => offset(len, d)?,
-            SeekFrom::Current(d) => offset(self.cursor, d)?,
-        };
-        self.cursor = new;
-        Ok(new)
+impl File {
+    pub fn new(fd: Fd) -> Self {
+        Self { fd }
     }
 }
 
-fn offset(base: u64, delta: i64) -> io::Result<u64> {
-    let s = base as i128 + delta as i128;
-    if s < 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "seek before start of file",
-        ));
+impl File {
+    pub fn close(self) -> std::io::Result<()>
+    where
+        Self: Sized,
+    {
+        let req = Request::File(FileOp::Close { fd: self.fd });
+        match trap(req) {
+            Response::File(FileResult::Close(res)) => res,
+            wrong => panic!("runtime broke protocol {:?}", wrong),
+        }
     }
-    if s > u64::MAX as i128 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "seek past u64 max",
-        ));
+
+    pub fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let req = Request::File(FileOp::Read {
+            fd: self.fd,
+            len: buf.len(),
+        });
+        match trap(req) {
+            Response::File(FileResult::Read(res)) => match res {
+                io::Result::Ok(value) => {
+                    let n = value.len();
+                    buf[..n].copy_from_slice(&value);
+                    io::Result::Ok(n)
+                }
+                io::Result::Err(err) => io::Result::Err(err),
+            },
+            wrong => panic!("runtime broke protocol {:?}", wrong),
+        }
     }
-    Ok(s as u64)
+
+    pub fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let req = Request::File(FileOp::Write {
+            fd: self.fd,
+            data: buf.to_vec(),
+        });
+        match trap(req) {
+            Response::File(FileResult::Write(res)) => res,
+            wrong => panic!("runtime broke protocol {:?}", wrong),
+        }
+    }
+
+    pub fn lseek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        let req = Request::File(FileOp::Seek { fd: self.fd, pos });
+
+        match trap(req) {
+            Response::File(FileResult::Seek(res)) => res,
+            wrong => panic!("runtime broke protocol {:?}", wrong),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{
+        io::SeekFrom,
+        sync::mpsc::{Receiver, Sender, channel},
+    };
+
+    use crate::{
+        abstraction::file_system::OpenMode,
+        simulation::runtime::replica::handles::{HANDLE, Handle},
+    };
+
+    fn init() -> (Sender<Response>, Receiver<Request>) {
+        let (req_sender, req_receiver) = channel::<Request>();
+        let (resp_sender, resp_receiver) = channel::<Response>();
+
+        init_handel(req_sender, resp_receiver);
+        (resp_sender, req_receiver)
+    }
+
+    fn init_handel(sender: Sender<Request>, receiver: Receiver<Response>) {
+        HANDLE.with_borrow_mut(|handle| {
+            *handle = Some(Handle {
+                request: sender,
+                response: receiver,
+            })
+        })
+    }
+
+    use super::*;
+    #[test]
+    fn open() {
+        // Setup
+        let (resp_sender, req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        // Prepare response
+        resp_sender
+            .send(Response::File(FileResult::Open(Ok(0))))
+            .unwrap();
+        // Make Request and send it
+        let file = fs.open("test", OpenMode::Read);
+        // Validate request came
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Open {
+                path: String::from("test"),
+                mode: OpenMode::Read
+            })
+        );
+        let file = file.unwrap();
+        assert_eq!(file.fd, 0);
+    }
+
+    #[test]
+    fn open_error() {
+        let (resp_sender, req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        resp_sender
+            .send(Response::File(FileResult::Open(Err(io::Error::from(
+                io::ErrorKind::NotFound,
+            )))))
+            .unwrap();
+
+        let file = fs.open("missing", OpenMode::Read);
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Open {
+                path: String::from("missing"),
+                mode: OpenMode::Read,
+            })
+        );
+        let err = file.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn delete() {
+        let (resp_sender, req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        resp_sender
+            .send(Response::File(FileResult::Delete(Ok(()))))
+            .unwrap();
+
+        let res = fs.delete("test");
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Delete {
+                path: String::from("test"),
+            })
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn read() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Read(Ok(vec![1, 2, 3, 4]))))
+            .unwrap();
+
+        let mut buf = [0u8; 4];
+        let n = file.read(&mut buf).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Read { fd: 0, len: 4 }));
+        assert_eq!(n, 4);
+        assert_eq!(&buf, &[1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn read_partial() {
+        // Runtime returns fewer bytes than the buffer can hold.
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Read(Ok(vec![9, 9]))))
+            .unwrap();
+
+        let mut buf = [0u8; 8];
+        let n = file.read(&mut buf).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Read { fd: 0, len: 8 }));
+        assert_eq!(n, 2);
+        assert_eq!(&buf[..2], &[9, 9]);
+        assert_eq!(&buf[2..], &[0; 6]); // tail left untouched
+    }
+
+    #[test]
+    fn read_error() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(7);
+
+        resp_sender
+            .send(Response::File(FileResult::Read(Err(io::Error::from(
+                io::ErrorKind::UnexpectedEof,
+            )))))
+            .unwrap();
+
+        let mut buf = [0u8; 8];
+        let res = file.read(&mut buf);
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Read { fd: 7, len: 8 }));
+        assert_eq!(res.unwrap_err().kind(), io::ErrorKind::UnexpectedEof);
+        assert_eq!(&buf, &[0; 8]); // nothing copied on error
+    }
+
+    #[test]
+    fn write() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Write(Ok(3))))
+            .unwrap();
+
+        let n = file.write(&[1, 2, 3]).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Write {
+                fd: 0,
+                data: vec![1, 2, 3],
+            })
+        );
+        assert_eq!(n, 3);
+    }
+
+    #[test]
+    fn lseek() {
+        let (resp_sender, req_receiver) = init();
+        let mut file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Seek(Ok(128))))
+            .unwrap();
+
+        let pos = file.lseek(SeekFrom::Start(128)).unwrap();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(
+            req,
+            Request::File(FileOp::Seek {
+                fd: 0,
+                pos: SeekFrom::Start(128),
+            })
+        );
+        assert_eq!(pos, 128);
+    }
+
+    #[test]
+    fn close() {
+        let (resp_sender, req_receiver) = init();
+        let file = File::new(0);
+
+        resp_sender
+            .send(Response::File(FileResult::Close(Ok(()))))
+            .unwrap();
+
+        let res = file.close();
+
+        let req = req_receiver.try_recv().unwrap();
+        assert_eq!(req, Request::File(FileOp::Close { fd: 0 }));
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "runtime broke protocol")]
+    fn protocol_mismatch() {
+        // Runtime answers an Open with a Delete response — the stub must reject it.
+        let (resp_sender, _req_receiver) = init();
+        let fs = super::FileSystem {};
+
+        resp_sender
+            .send(Response::File(FileResult::Delete(Ok(()))))
+            .unwrap();
+
+        let _ = fs.open("test", OpenMode::Read);
+    }
 }

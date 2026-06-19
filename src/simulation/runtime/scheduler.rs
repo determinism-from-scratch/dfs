@@ -1,10 +1,12 @@
-use crate::{
-    abstraction::file_system::FileSystem,
-    simulation::runtime::{Action, Context},
-};
-
 pub mod fifo;
 
+use crate::simulation::runtime::ReplicaId;
+
+use super::Event;
+use super::replica::handles::Request;
+
 pub trait Scheduler {
-    fn decide<FS: FileSystem>(&mut self, cx: &Context<FS>) -> Action;
+    fn schedule(&mut self, req: Request, replica_id: ReplicaId) -> Event;
+
+    fn reschedule(&mut self, event: Event) -> Event;
 }
